@@ -1,0 +1,4 @@
+[core]
+    remote = model
+['remote "model"']
+    url = ../g-drive:/save_models/yaming
