@@ -18,23 +18,31 @@ def Parsing_XML():
     xml_path = 'D:\\yaming_dataset\\[라벨]음식분류_TRAIN\\xml/'
     img_path = 'D:\\yaming_dataset\\음식 이미지 및 영양정보 텍스트\\Training/'
     
-    txt_dir_path = 'D:\\yaming_dataset\\dataset_2\\label'
-    img_dir_path = 'D:\\yaming_dataset\\dataset_2\\image'
-
-    search_img_path = "D:\\yaming_dataset\\Yaming_AI\\yolov7\\dataset\\images"
+    txt_dir_path = 'D:\\yaming_dataset\\dataset_2\\labels'
+    img_dir_path = 'D:\\yaming_dataset\\dataset_2\\images'
+    #search_img_path = "D:\\yaming_dataset\\Yaming_AI\\yolov7\\dataset\\images"
     search_img_path2 = "D:\\yaming_dataset\\dataset\\temp\\images"
 
 
-    search_file_list = os.listdir(search_img_path+"/")
+    #search_file_list = os.listdir(search_img_path+"/")
     search_file_list2 = os.listdir(search_img_path2+"/")
     search_file_list3 = os.listdir(img_path+"/")
 
-    nonext_file_list = list(map(lambda x: x[:-5], search_file_list))
-    nonext_file_list2 = list(map(lambda x: x[:-5], search_file_list2))
-    nonext_file_list3 = list(map(lambda x: x[:-5], search_file_list3))
+    # nonext_file_list = list(map(lambda x: x[:-5], search_file_list))
+    #문자열 슬라이싱으로 할것
+    nonext_file_list2 = list(map(lambda x: x.split('.')[0], search_file_list2))
+    nonext_file_list3 = []
+    ext_file_list3 = []
+    for filelist in search_file_list3:
+        temp_file_list = os.listdir(img_path+"/"+filelist+"/")
+        # print(list(map(lambda x: x.split('.')[0], temp_file_list)))
+        ext_file_list3.extend(temp_file_list)
+        nonext_file_list3.extend(list(map(lambda x: x.split('.')[0], temp_file_list)))
+
+
 
     dir_list = os.listdir(xml_path+"/")
-    data_max_count = 499
+    data_max_count = 999
     
     
     for dir in dir_list:
@@ -56,10 +64,28 @@ def Parsing_XML():
             except:
                 # passed_arr.append(file)
                 continue
-            with(open(txt_dir_path + "/" + file[:-4]+".txt",mode="w")) as label_file:
+            #이미지 이동(jpg or jpeg or png)
+            #확장자가 모두 달라서 확장자미포함 리스트를 검색하여 확장자포함 리스트의 index로 두어 확장자처리함
+            # 이미지를 이미 옮긴 이력이 있어서 다른 위치의 파일까지 검색 후 처리
+            if file.split('.')[0] in nonext_file_list2:
+                index = nonext_file_list2.index(file.split('.')[0])
+                shutil.copy("D:\\yaming_dataset\\dataset\\temp\\images/"+search_file_list2[index], img_dir_path+"/"+search_file_list2[index])
+
+            elif file.split('.')[0] in nonext_file_list3:
+                index = nonext_file_list3.index(file.split('.')[0])
+                shutil.copy(img_path+dir+"/"+ext_file_list3[index], img_dir_path+"/"+ext_file_list3[index])
+
+            else:
+                # print("Not had Image")
+                continue 
+
+            with(open(txt_dir_path + "/" + file.split('.')[0]+".txt",mode="w")) as label_file:
                 for obj in target['annotation']['object']:
                     #접시 정보는 패스
-                    if obj['name'] == "dish":
+                    try:
+                        if obj['name'] == "dish":
+                            continue
+                    except:
                         continue
                         
                     # min, max좌표 얻기
@@ -80,24 +106,15 @@ def Parsing_XML():
                     label_file.write(
                         f"{class_index} {x} {y} {w} {h}\n"
                     )
-                #이미지 이동(jpg or jpeg or png)
-                #확장자가 모두 달라서 확장자미포함 리스트를 검색하여 확장자포함 리스트의 index로 두어 확장자처리함
-                # 이미지를 이미 옮긴 이력이 있어서 다른 위치의 파일까지 검색 후 처리
-                if file[:-4] in nonext_file_list:
-                    index = nonext_file_list.index(file[:-4])
-                    shutil.copy("D:\\yaming_dataset\\Yaming_AI\\yolov7\\dataset\\images/"+search_file_list[index], img_dir_path+"/"+search_file_list[index])
-
-
-                elif file[:-4] in nonext_file_list2:
-                    index = nonext_file_list2.index(file[:-4])
-                    shutil.copy("D:\\yaming_dataset\\dataset\\temp\\images/"+search_file_list2[index], img_dir_path+"/"+search_file_list2[index])
-
-                elif file[:-4] in nonext_file_list3:
-                    index = nonext_file_list3.index(file[:-4])
-                    shutil.copy(img_path+dir+"/"+search_file_list3[index], img_dir_path+"/"+search_file_list3[index])
-
 
                 data_count += 1
+
+                # if file[:-4] in nonext_file_list:
+                #     index = nonext_file_list.index(file[:-4])
+                #     shutil.copy("D:\\yaming_dataset\\Yaming_AI\\yolov7\\dataset\\images/"+search_file_list[index], img_dir_path+"/"+search_file_list[index])
+
+
+
                 stdout.write("\r===== In  "+dir+"  DIR : "+str(data_count+1)+" progressed=====")
                 stdout.flush()
 
