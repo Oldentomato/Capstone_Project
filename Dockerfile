@@ -4,14 +4,14 @@ COPY /api /app/api
 COPY /models /app/models
 COPY /utils /app/utils
 COPY requirements.txt /app/requirements.txt
+COPY /model /app/model
 
-WORKDIR /app
+WORKDIR /app/api
 RUN apt-get update && \
     python -m pip install --upgrade pip && \
     pip install -r requirements.txt
 
-COPY /model /app/model
-RUN dvc pull
 
-CMD tail -f /dev/null
+
+CMD uvicorn api:app 
 # RUN python ./api/api.py
