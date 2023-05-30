@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import sys
 
-sys.path.append(r"D:\\yaming_dataset\\Yaming_AI\\api")
+sys.path.append(r"/app")
 from models.experimental import attempt_load
 from utils.general import non_max_suppression,scale_coords
 from utils.torch_utils import time_synchronized
