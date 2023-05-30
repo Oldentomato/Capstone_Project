@@ -1,10 +1,12 @@
+import sys
+sys.path.append(r"/app")
 from fastapi import FastAPI, UploadFile, status
-from database import send_query
+from api.database import send_query
 import os
 import uuid
 from pydantic import BaseModel
 from predict import Detect_Image
-from data_type import category
+from api.data_type import category
 
 
 app = FastAPI()

@@ -17,5 +17,5 @@ RUN dvc init --no-scm && \
     mkdir model && \
     dvc pull
 
-CMD uvicorn api:app
+CMD uvicorn api.api:app
 # RUN python ./api/api.py
