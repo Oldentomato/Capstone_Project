@@ -11,7 +11,9 @@ RUN apt-get update && \
     python -m pip install --upgrade pip && \
     pip install -r requirements.txt
 
-
+RUN dvc init && \
+    mkdir model && \
+    dvc pull
 
 CMD uvicorn api:app 
 # RUN python ./api/api.py
