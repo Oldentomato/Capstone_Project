@@ -5,7 +5,7 @@ from api.database import send_query
 import os
 import uuid
 from pydantic import BaseModel
-from predict import Detect_Image
+from api.predict import Detect_Image
 from api.data_type import category
 
 
