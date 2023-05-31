@@ -18,3 +18,4 @@ PyMySQL==1.0.3
 scipy
 dvc
 python-multipart
+dvc_gdrive

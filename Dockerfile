@@ -3,6 +3,7 @@ COPY /modules /app/modules
 COPY /api /app/api
 COPY /models /app/models
 COPY /utils /app/utils
+COPY model.dvc /app/model.dvc
 COPY requirements.txt requirements.txt
 
 
@@ -16,6 +17,7 @@ WORKDIR /app
 RUN dvc init --no-scm && \
     mkdir model && \
     mkdir test_image && \
+    dvc remote add -d storage gdrive:1M_m18jIdwLDsyHXqw09_mZGZ57H77GWZ && \
     dvc pull
 
 CMD uvicorn api.api:app --host=0.0.0.0
