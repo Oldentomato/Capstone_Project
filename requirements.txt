@@ -17,3 +17,4 @@ requests>=2.2
 PyMySQL==1.0.3
 scipy
 dvc
+python-multipart

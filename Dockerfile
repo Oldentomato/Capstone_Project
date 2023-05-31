@@ -15,7 +15,8 @@ WORKDIR /app
 
 RUN dvc init --no-scm && \
     mkdir model && \
+    mkdir test_image && \
     dvc pull
 
-CMD uvicorn api.api:app
+CMD uvicorn api.api:app --host=0.0.0.0
 # RUN python ./api/api.py
