@@ -51,7 +51,7 @@ async def imagetest(file: UploadFile, userid: int):
 
         detect_module = Detect_Image(model_name = "best_2",
                              img_path = os.path.join(UPLOAD_DIR,str(userid),filename),
-                             weight_path = "model/best_2.pt")
+                             weight_path = "/data/model/best_2.pt")
 
 
         model_result = detect_module.detect()

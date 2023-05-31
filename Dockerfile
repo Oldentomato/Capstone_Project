@@ -14,11 +14,8 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-RUN dvc init --no-scm && \
-    mkdir model && \
-    mkdir test_image && \
-    dvc remote add -d storage gdrive:1M_m18jIdwLDsyHXqw09_mZGZ57H77GWZ && \
-    dvc pull
+RUN mkdir test_image
+
 
 CMD uvicorn api.api:app --host=0.0.0.0
 # RUN python ./api/api.py
