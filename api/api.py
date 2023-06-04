@@ -1,7 +1,7 @@
 import sys
 sys.path.append(r"/app")
 from fastapi import FastAPI, UploadFile, status
-from api.database import send_query
+from database import send_query
 import os
 import uuid
 from pydantic import BaseModel
@@ -27,8 +27,8 @@ class Food(BaseModel):
 
 @app.get("/test")
 async def test():
-    result = send_query("select ifnull(max(name),0) name from user where name='woosung'")
-    return result[0][0]
+    result = send_query("create table FoodData (음식이름 VARCHAR(10), 중량 INT(3), 에너지 DOUBLE, 탄수화물 DOUBLE, 당류 DOUBLE, 지방 DOUBLE, 단백질 DOUBLE, 칼슘 DOUBLE, 인 DOUBLE, 나트륨 DOUBLE, 칼륨 DOUBLE, 마그네슘 DOUBLE, 철 DOUBLE, 아연 DOUBLE, 콜레스테롤 DOUBLE, 트랜스지방 DOUBLE);")
+    return result
 
 
 
@@ -51,7 +51,7 @@ async def imagetest(file: UploadFile, userid: int):
 
         detect_module = Detect_Image(model_name = "best_2",
                              img_path = os.path.join(UPLOAD_DIR,str(userid),filename),
-                             weight_path = "/data/model/best_2.pt")
+                             weight_path = "/data/best_2.pt")
 
 
         model_result = detect_module.detect()

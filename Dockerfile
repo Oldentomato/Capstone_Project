@@ -6,6 +6,12 @@ COPY /utils /app/utils
 COPY model.dvc /app/model.dvc
 COPY requirements.txt requirements.txt
 
+ENV MYSQLHOST '35.247.81.142'
+ENV MYSQLUSER 'root'
+ENV MYSQLPASS 'qwer1234'
+ENV MYSQLPORT 5000
+ENV MYSQLDB 'yaming'
+
 
 RUN apt-get update && \
     python -m pip install --upgrade pip && \

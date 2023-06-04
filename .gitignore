@@ -1,4 +1,7 @@
 __pycache__
 test_image
 
-/model
+/pytorch_model
+/tensor_hyper
+/tensor_model
+/tensor_result_graph
