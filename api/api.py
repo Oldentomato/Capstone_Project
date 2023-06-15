@@ -5,7 +5,7 @@ from database import send_query
 import os
 import uuid
 from pydantic import BaseModel
-from api.predict import Detect_Image
+from api.tensor_predict import Tensor_Detect
 from api.data_type import category
 
 
@@ -25,10 +25,15 @@ class Food(BaseModel):
     foodname: str
 
 
-@app.get("/test")
-async def test():
+@app.get("/createtable")
+async def createtable():
     result = send_query("create table FoodData (음식이름 VARCHAR(10), 중량 INT(3), 에너지 DOUBLE, 탄수화물 DOUBLE, 당류 DOUBLE, 지방 DOUBLE, 단백질 DOUBLE, 칼슘 DOUBLE, 인 DOUBLE, 나트륨 DOUBLE, 칼륨 DOUBLE, 마그네슘 DOUBLE, 철 DOUBLE, 아연 DOUBLE, 콜레스테롤 DOUBLE, 트랜스지방 DOUBLE);")
     return result
+
+
+@app.get("/healthcheck", status_code=status.HTTP_200_OK)
+async def healthcheck():
+    return {"success": True}
 
 
 
@@ -49,9 +54,9 @@ async def imagetest(file: UploadFile, userid: int):
             fp.write(content) #서버 로컬 스토리지에 이미지 저장
 
 
-        detect_module = Detect_Image(model_name = "best_2",
+        detect_module = Tensor_Detect(model_name = "best_2",
                              img_path = os.path.join(UPLOAD_DIR,str(userid),filename),
-                             weight_path = "/data/best_2.pt")
+                             weight_path = "/data/best.h5")
 
 
         model_result = detect_module.detect()

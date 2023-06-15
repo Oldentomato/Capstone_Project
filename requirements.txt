@@ -1,8 +1,6 @@
 fastapi==0.92.0
 uvicorn==0.20.0
-torch==1.8.0
-torchvision==0.9.0
-torchaudio==0.8.0
+tensorflow==2.3.0
 typeguard==2.13.3
 pandas>=1.1.4
 seaborn>=0.11.0

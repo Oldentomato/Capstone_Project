@@ -23,7 +23,7 @@ def Training():
                             project_name='experience_1',
                             search_epochs=10,
                             train_epochs=100,
-                            isoverwrite = False,
+                            isoverwrite = True,
                             LAYER_INFO={
                                     "min_value": 32,
                                     "max_value": 512,
@@ -32,6 +32,8 @@ def Training():
                                     "learning_rate":[0.01,0.001,0.0001]})
 
     create_model.Draw_Graph(history)
+
+  
 
 
 if __name__ == "__main__":

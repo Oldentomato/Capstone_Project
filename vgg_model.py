@@ -1,8 +1,8 @@
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.layers import Dense, Dropout, Flatten
+from tensorflow.keras.layers import Dense, Dropout, Flatten,GlobalAveragePooling2D
 from tensorflow.keras.applications.vgg16 import VGG16
-from tensorflow.keras.models import Model, Sequential
+from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 import matplotlib.pyplot as plt
 import splitfolders
@@ -48,6 +48,7 @@ class VGG_MODEL():
             rescale = 1. /255, # 각픽셀을 최대값 255을 중심으로 0과 1사이의 값으로 재구성
             rotation_range = 40,
             width_shift_range= 0.2,
+            vertical_flip = True, 
             height_shift_range = 0.2, 
             shear_range = 0.2,
             zoom_range = 0.2,
@@ -90,24 +91,14 @@ class VGG_MODEL():
         return train_generator, valid_generator
     
 
-    def __Set_Dataset(self):
-        parts = tf.strings.split(self.TRAIN_DIRECTORY+'train/')
-        label = parts[-2]
-
-        image = tf.io.read_file(self.TRAIN_DIRECTORY+'train')
-        image = tf.image.decode_jpeg
-        pass
-
-
-
     
 
     def Set_Callbacks(self):
         checkpoint = ModelCheckpoint(
-            str(self.SAVE_MODEL_DIRECTORY)+'best.h5', #모델 저장 경로
+            '/data/api/tensor_model/best.h5', #모델 저장 경로
             monitor='val_accuracy', #모델을 저장할 때 기준이 되는 값
-            verbose = 1, # 1이면 저장되었다고 화면에 뜨고 0이면 안뜸
-            save_best_only=True,
+            verbose = 0, # 1이면 저장되었다고 화면에 뜨고 0이면 안뜸
+            save_best_only=False,
             mode = 'auto',
             #val_acc인 경우, 정확도이기 때문에 클수록 좋으므로 max를 쓰고, val_loss일 경우, loss값이기 떄문에 작을수록 좋으므로 min을써야한다
             #auto일 경우 모델이 알아서 min,max를 판단하여 모델을 저장한다
@@ -133,34 +124,40 @@ class VGG_MODEL():
 
         print("train_predict processed....")
         bottleneck_features_train = vgg16.predict_generator(
-            train_generator, len(train_generator) // 8
+            train_generator, 8
         )
         np.save(open('bottleneck_features/bottleneck_features_train.npy','wb'),
                 bottleneck_features_train)
         
         print("valid_predict processed....")
         bottleneck_features_valid = vgg16.predict_generator(
-            valid_generator, len(valid_generator) // 8
+            valid_generator, 8
         )
         np.save(open('bottleneck_features/bottleneck_features_valid.npy','wb'),
                 bottleneck_features_valid)
 
 
     def Run_Training(self, objective, search_max_epochs, dir, project_name, search_epochs, train_epochs,LAYER_INFO, isoverwrite):
-        train,valid = self.__Set_Dataset()
+        train,valid = self.__Set_Dataset_Generator()
         # train_list = []
         # valid_list = []
 
-        # for _, labels in train:
-        #     print(labels)
-        #     break
 
-        # for _ in range(len(train) // 8):
-        #     _,tlabel = train.next()
-        #     train_list.append(tlabel)
+        # for i,(_, labels )in enumerate(train):
+        #     train_list.append(list(labels))
+
+        # for _,label in train:
+        #     temp = []
+        #     temp.append(label)
+        #     count += 1
+        #     if count == 8:
+        #         train_list.append(temp)
+        #         count  = 0
+        #         break
+            
         
         # for _ in range(len(valid) // 8):
-        #     _,vlabel = valid.next()
+        #     _,vlabel = valid
         #     valid_list.append(vlabel)
         
 
@@ -170,11 +167,12 @@ class VGG_MODEL():
         # valid_data = np.load(open('bottleneck_features/bottleneck_features_valid.npy','rb'))
 
 
-        # print(np.shape(train_data))
         # print(np.shape(train_labels))
-        # print(np.shape(valid_data))
         # print(np.shape(valid_labels))
         # return 
+
+        train_data, train_labels = train.next()
+        valid_data, valid_labels = valid.next()
 
 
         def model_builder(hp):
@@ -183,15 +181,24 @@ class VGG_MODEL():
             hp_activate = hp.Choice('activate', values = LAYER_INFO["activates"])
             hp_learning_rate = hp.Choice('learning_rate',values = LAYER_INFO["learning_rate"])
 
-            model = Sequential()
-            model.add(Flatten(input_shape=train_data.shape[1:]))
-            model.add(Dense(units=hp_units, activation = hp_activate))
-            model.add(Dropout(0.2))
-            model.add(Dense(53, activation = 'softmax'))
+            vgg16 = VGG16(weights='imagenet', include_top=False, input_shape=(self.IMG_SIZE,self.IMG_SIZE,3)) #3채널만 됨
+
+            vgg16.trainable = False 
+
+            flat = GlobalAveragePooling2D()(vgg16.output)
+
+            Add_layer = Dense(units=hp_units, activation = hp_activate)(flat)
+            Add_layer = Dense(53, activation = 'softmax')(Add_layer)
+            model = Model(inputs=vgg16.input, outputs=Add_layer)
+            # model = Sequential()
+            # model.add(Flatten(input_shape=train_data.shape[1:]))
+            # model.add(Dense(units=hp_units, activation = hp_activate))
+            # model.add(Dropout(0.2))
+            # model.add(Dense(53, activation = 'softmax'))
 
             model.summary() #모델 구성을 보여줌
 
-            model.compile(optimizer=tf.keras.optimizers.Adam(lr=hp_learning_rate) ,loss='sparse_categorical_crossentropy',metrics=['accuracy'])
+            model.compile(optimizer=tf.keras.optimizers.Adam(lr=hp_learning_rate) ,loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
 
             return model
         
@@ -215,17 +222,56 @@ class VGG_MODEL():
         """)
 
         model = tuner.hypermodel.build(best_hps)
+        #하면서 드는 생각
+        #예상)이 프로젝트는 loss를 신경쓰지 않아도된다.
+        #sparse categorical은 one hot encoding이 아닌 단순히 라벨의 번호로 분류된다.
+        #라벨간 서로의 연관성이 없을 때 사용한다. loss는 모델이 틀릴 때 얼마나 정답과 멀어지게 되는지에
+        #대한 척도이다. 특히나 output이 많은 모델에서 실제값이 0이고 예측값이 52이면 엄청난 오차이기 때문에 
+        #loss값이 많이 상승되는 것 같다.
+
+        #예상)sigmoid를 사용할 때만 히든레이어를 사용하지 않는다.
+        #예전 실험으로 sigmoid일 때 모든 모델들의 공통점은 히든레이어를 쓰지않고
+        #곧바로 output레이어로 할 때가 정확도가 더 높게 나왔다. 
+        #sigmoid가 레이어를 거칠수록 영향력이 작아진다는 말이 있었는데 그 영향인것 같다.
+
+        #예상)vgg같은 모델을 사용할 때 trainable을 꺼두자.
+        #다른 블로그의 말로는 이미 학습된 모델을 사용할 때 fully-connected로 연결해서 학습할 경우,
+        #모델(vgg)의 파라미터들은 역전파를 꺼두어야한다고 한다. 그러지 않으면 학습이 되지 않은 데이터들에 의해
+        #기껏 학습해논 모델의 파라미터들이 엉망이 될 수도 있다고 한다. 
+        #전이학습 기법으로 1회 False학습하다가 True로 전환하거나 아예 꺼두자
+
+        #바로 위와 같은 상황이면 병목특징 추출 학습기법을 활용하자
+        #단 정답레이어를 배치별로 나누어 생성해야하는데  이 점이 해결이 안되는 상황이다.
+        #병목특징 추출기법은 매 학습마다 cnn을 이용해 이미지의 특징추출을 하는데,
+        #cnn부분이 역전파가 필요가 없다면 매 학습마다 특징추출하는 것이 자원의 낭비가 된다. 
+        #그러기에 미리 학습데이터들의 특징을 추출하고 fully-connected에서만 학습을 진행하면 된다. 
+
+
 
         
+        # with tf.device("/gpu:0"):
+        #     model.fit(train_data,train_labels,
+        #                         epochs=1,
+        #                         validation_data=(valid_data,valid_labels),
+        #                         verbose=0,
+        #                         shuffle=True)
+            
+        # model.trainable = True
+        # model = tuner.hypermodel.build(best_hps)
+
         with tf.device("/gpu:0"):
-            history = model.fit(train_data,train_labels,
+            history = model.fit(train,
                                 epochs=train_epochs,
-                                validation_data=(valid_data,valid_labels),
+                                steps_per_epoch=len(train),
+                                validation_data=valid,
+                                validation_steps=len(valid),
                                 callbacks = self.Set_Callbacks(),
                                 verbose=0,
                                 shuffle=True)
             
+            
         return history
+    
 
                             
     def Draw_Graph(self, history):
@@ -235,8 +281,9 @@ class VGG_MODEL():
         plt.xlabel('epoch')
         plt.legend(['train_loss','val_loss'])
         if self.SAVE_GRAPH_DIRECTORY != None:
-            plt.savefig(str(self.SAVE_GRAPH_DIRECTORY)+"validation.png")
-        plt.show
+            plt.savefig(str(self.SAVE_GRAPH_DIRECTORY)+"loss.png")
+        
+        plt.clf()
 
         plt.plot(history.history['accuracy'])
         plt.plot(history.history['val_accuracy'])
@@ -244,6 +291,6 @@ class VGG_MODEL():
         plt.xlabel('epoch')
         plt.legend(['train_accuracy','val_accuracy'])
         if self.SAVE_GRAPH_DIRECTORY != None:
-            plt.savefig(str(self.SAVE_GRAPH_DIRECTORY)+"train.png")
-        plt.show()
+            plt.savefig(str(self.SAVE_GRAPH_DIRECTORY)+"acc.png")
+        
 

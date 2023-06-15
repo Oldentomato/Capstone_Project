@@ -1,12 +1,8 @@
 FROM python:3.9
-COPY /modules /app/modules
 COPY /api /app/api
-COPY /models /app/models
-COPY /utils /app/utils
-COPY model.dvc /app/model.dvc
 COPY requirements.txt requirements.txt
 
-ENV MYSQLHOST '35.247.81.142'
+ENV MYSQLHOST '35.197.32.189'
 ENV MYSQLUSER 'root'
 ENV MYSQLPASS 'qwer1234'
 ENV MYSQLPORT 5000
