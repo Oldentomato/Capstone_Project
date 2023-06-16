@@ -1,8 +1,7 @@
 __pycache__
 test_image
 
-/pytorch_model
-/tensor_hyper
-/tensor_model
-/tensor_result_graph
-/bottleneck_features
+tensorflow/tensor_hyper
+tensorflow/tensor_model
+tensorflow/tensor_result_graph
+tensorflow/bottleneck_features
