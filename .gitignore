@@ -5,3 +5,6 @@ tensorflow/tensor_hyper
 tensorflow/tensor_model
 tensorflow/tensor_result_graph
 tensorflow/bottleneck_features
+tensorflow/triton/core/1
+tensorflow/saved_model
+tensorflow/tensor_ckpt

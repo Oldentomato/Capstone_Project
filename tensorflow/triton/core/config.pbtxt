@@ -1,0 +1,19 @@
+name: "core"
+platform: "tensorflow_savedmodel"
+
+input [
+    {
+        name: "INPUT__0"
+        data_type: TYPE_FP32
+        dims: [1, 512, 512, 3]
+    }
+]
+
+output [
+    {
+        name: "OUTPUT__0"
+        data_type: TYPE_FP32
+        dims: [-1]
+    }
+]
+

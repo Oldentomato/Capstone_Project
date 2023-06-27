@@ -10,6 +10,7 @@ import os
 import kerastuner as kt
 from tqdm.keras import TqdmCallback
 import numpy as np
+import sys
 
 
 
@@ -23,6 +24,7 @@ class VGG_MODEL():
         self.SAVE_MODEL_DIRECTORY = save_model_dir,
         self.CLASSES = classes,
         self.SAVE_GRAPH_DIRECTORY = save_graph_dir
+        self.SAVE_PARAM = None
 
     def Use_GPU(self) -> None:
         gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -39,7 +41,7 @@ class VGG_MODEL():
 
 
 
-    def __Set_Dataset_Generator(self):
+    def __Set_Dataset_Generator(self,batch_size:int):
         if 'train' not in os.listdir(self.TRAIN_DIRECTORY):
             splitfolders.ratio(self.IMG_DIRECTORY, self.TRAIN_DIRECTORY,seed=1337, ratio=(0.8,0.2))
 
@@ -74,7 +76,7 @@ class VGG_MODEL():
             # other: y_col 데이터의 numpy 배열,
             # None: 대상이 반환되지 않습니다(생성기는 에서 사용하는 데 유용한 이미지 데이터의 배치만 생성합니다 model.predict_generator()).
             shuffle = False, # 섞는다는 뜻. 순서를 무작위로 적용한다.
-            batch_size = 8, # 배치 size는 한번에 gpu를 몇 개 보는가. 한번에 8장씩 학습시킨다
+            batch_size = batch_size, # 배치 size는 한번에 gpu를 몇 개 보는가. 한번에 8장씩 학습시킨다
         )
 
 
@@ -85,7 +87,7 @@ class VGG_MODEL():
             color_mode = 'rgb',
             class_mode = 'sparse',
             shuffle = False,
-            batch_size = 8,
+            batch_size = batch_size,
         )
 
         return train_generator, valid_generator
@@ -93,23 +95,23 @@ class VGG_MODEL():
 
     
 
-    def Set_Callbacks(self):
+    def Set_Callbacks(self, batch_size):
         checkpoint = ModelCheckpoint(
-            '/data/api/tensor_model/best.h5', #모델 저장 경로
+            '/data/api/tensorflow/tensor_ckpt/model-{epoch:04d}.h5', #모델 저장 경로
             monitor='val_accuracy', #모델을 저장할 때 기준이 되는 값
             verbose = 0, # 1이면 저장되었다고 화면에 뜨고 0이면 안뜸
             save_best_only=False,
-            mode = 'auto',
+            mode = 'max',
             #val_acc인 경우, 정확도이기 때문에 클수록 좋으므로 max를 쓰고, val_loss일 경우, loss값이기 떄문에 작을수록 좋으므로 min을써야한다
             #auto일 경우 모델이 알아서 min,max를 판단하여 모델을 저장한다
             save_weights_only=False, #가중치만 저장할것인가 아닌가
-            save_freq = 1 #1번째 에포크마다 가중치를 저장 period를 안쓰고 save_freq룰 씀
+            save_freq = 1*batch_size #3번째 에포크마다 가중치를 저장 period를 안쓰고 save_freq룰 씀
         )
 
         earlystop = EarlyStopping(
             monitor='val_accuracy',
-            min_delta = 0.01,
-            patience = 5,
+            min_delta = 0.05,
+            patience = 3*batch_size,
             verbose = 1,
             mode='auto'
         )
@@ -137,8 +139,39 @@ class VGG_MODEL():
                 bottleneck_features_valid)
 
 
-    def Run_Training(self, objective, search_max_epochs, dir, project_name, search_epochs, train_epochs,LAYER_INFO, isoverwrite):
-        train,valid = self.__Set_Dataset_Generator()
+    def Run_Training(self, **kargs):
+        train,valid = self.__Set_Dataset_Generator(kargs['batch_size'])
+        vgg16 = VGG16(weights='imagenet', include_top=False, input_shape=(self.IMG_SIZE,self.IMG_SIZE,3)) #3채널만 됨
+
+        vgg16.trainable = False 
+
+        flat = GlobalAveragePooling2D()(vgg16.output)
+
+        Add_layer = Dense(units=hp_units_1, activation = kargs["activation"])(flat)
+        Add_layer = Dense(units=hp_units_2, activation = kargs["activation"])(Add_layer)
+        Add_layer = Dense(units=hp_units_3, activation = kargs["activation"])(Add_layer)
+        Add_layer = Dense(53, activation = 'softmax')(Add_layer)
+        model = Model(inputs=vgg16.input, outputs=Add_layer)
+
+        model.summary() #모델 구성을 보여줌
+
+        model.compile(optimizer=tf.keras.optimizers.Adam(lr=kargs["learning_rate"]) ,loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+        with tf.device("/gpu:0"):
+            history = model.fit(train,
+                                epochs=kargs["train_epochs"],
+                                steps_per_epoch=len(train),
+                                validation_data=valid,
+                                validation_steps=len(valid),
+                                callbacks = self.Set_Callbacks(),
+                                verbose=0,
+                                shuffle=True)
+            
+            
+        return history
+
+
+    def Run_Training_Tuner(self, objective, search_max_epochs, dir, project_name, search_epochs, batch_size, train_epochs,LAYER_INFO, isoverwrite):
+        train,valid = self.__Set_Dataset_Generator(batch_size)
         # train_list = []
         # valid_list = []
 
@@ -167,8 +200,8 @@ class VGG_MODEL():
         # valid_data = np.load(open('bottleneck_features/bottleneck_features_valid.npy','rb'))
 
 
-        # print(np.shape(train_labels))
-        # print(np.shape(valid_labels))
+        # print(np.shape(train))
+        # print(np.shape(valid))
         # return 
 
         train_data, train_labels = train.next()
@@ -177,7 +210,9 @@ class VGG_MODEL():
 
         def model_builder(hp):
 
-            hp_units = hp.Int('units', min_value = LAYER_INFO["min_value"], max_value = LAYER_INFO["max_value"], step = LAYER_INFO["step"])
+            hp_units_1 = hp.Int('units_1', min_value = LAYER_INFO["min_value"], max_value = LAYER_INFO["max_value"], step = LAYER_INFO["step"])
+            # hp_units_2 = hp.Int('units_2', min_value = LAYER_INFO["min_value"], max_value = LAYER_INFO["max_value"], step = LAYER_INFO["step"])
+            # hp_units_3 = hp.Int('units_3', min_value = LAYER_INFO["min_value"], max_value = LAYER_INFO["max_value"], step = LAYER_INFO["step"])
             hp_activate = hp.Choice('activate', values = LAYER_INFO["activates"])
             hp_learning_rate = hp.Choice('learning_rate',values = LAYER_INFO["learning_rate"])
 
@@ -187,14 +222,11 @@ class VGG_MODEL():
 
             flat = GlobalAveragePooling2D()(vgg16.output)
 
-            Add_layer = Dense(units=hp_units, activation = hp_activate)(flat)
+            Add_layer = Dense(units=hp_units_1, activation = hp_activate)(flat)
+            # Add_layer = Dense(units=hp_units_2, activation = hp_activate)(Add_layer)
+            # Add_layer = Dense(units=hp_units_3, activation = hp_activate)(Add_layer)
             Add_layer = Dense(53, activation = 'softmax')(Add_layer)
             model = Model(inputs=vgg16.input, outputs=Add_layer)
-            # model = Sequential()
-            # model.add(Flatten(input_shape=train_data.shape[1:]))
-            # model.add(Dense(units=hp_units, activation = hp_activate))
-            # model.add(Dropout(0.2))
-            # model.add(Dense(53, activation = 'softmax'))
 
             model.summary() #모델 구성을 보여줌
 
@@ -214,50 +246,20 @@ class VGG_MODEL():
 
         best_hps = tuner.get_best_hyperparameters(num_trials = 1)[0]
 
+        f = open('/data/api/tensorflow/tensor_ckpt/hyper.txt','w')
+
         print(f"""
         The hyperparameter search is complete. The optimal number of units in the first densely-connected
-        layer is {best_hps.get('units')} and the optimal learning rate for the optimizer
+        # layer is {best_hps.get('units_1')}, and the optimal learning rate for the optimizer
         is {best_hps.get('learning_rate')}.
-        activate is {best_hps.get('activate')}.
-        """)
+        activate is {best_hps.get('activate')}. batch_size is {batch_size}.
+        """, file=f)
+
+        f.close()
 
         model = tuner.hypermodel.build(best_hps)
-        #하면서 드는 생각
-        #예상)이 프로젝트는 loss를 신경쓰지 않아도된다.
-        #sparse categorical은 one hot encoding이 아닌 단순히 라벨의 번호로 분류된다.
-        #라벨간 서로의 연관성이 없을 때 사용한다. loss는 모델이 틀릴 때 얼마나 정답과 멀어지게 되는지에
-        #대한 척도이다. 특히나 output이 많은 모델에서 실제값이 0이고 예측값이 52이면 엄청난 오차이기 때문에 
-        #loss값이 많이 상승되는 것 같다.
+        self.SAVE_PARAM = best_hps
 
-        #예상)sigmoid를 사용할 때만 히든레이어를 사용하지 않는다.
-        #예전 실험으로 sigmoid일 때 모든 모델들의 공통점은 히든레이어를 쓰지않고
-        #곧바로 output레이어로 할 때가 정확도가 더 높게 나왔다. 
-        #sigmoid가 레이어를 거칠수록 영향력이 작아진다는 말이 있었는데 그 영향인것 같다.
-
-        #예상)vgg같은 모델을 사용할 때 trainable을 꺼두자.
-        #다른 블로그의 말로는 이미 학습된 모델을 사용할 때 fully-connected로 연결해서 학습할 경우,
-        #모델(vgg)의 파라미터들은 역전파를 꺼두어야한다고 한다. 그러지 않으면 학습이 되지 않은 데이터들에 의해
-        #기껏 학습해논 모델의 파라미터들이 엉망이 될 수도 있다고 한다. 
-        #전이학습 기법으로 1회 False학습하다가 True로 전환하거나 아예 꺼두자
-
-        #바로 위와 같은 상황이면 병목특징 추출 학습기법을 활용하자
-        #단 정답레이어를 배치별로 나누어 생성해야하는데  이 점이 해결이 안되는 상황이다.
-        #병목특징 추출기법은 매 학습마다 cnn을 이용해 이미지의 특징추출을 하는데,
-        #cnn부분이 역전파가 필요가 없다면 매 학습마다 특징추출하는 것이 자원의 낭비가 된다. 
-        #그러기에 미리 학습데이터들의 특징을 추출하고 fully-connected에서만 학습을 진행하면 된다. 
-
-
-
-        
-        # with tf.device("/gpu:0"):
-        #     model.fit(train_data,train_labels,
-        #                         epochs=1,
-        #                         validation_data=(valid_data,valid_labels),
-        #                         verbose=0,
-        #                         shuffle=True)
-            
-        # model.trainable = True
-        # model = tuner.hypermodel.build(best_hps)
 
         with tf.device("/gpu:0"):
             history = model.fit(train,
@@ -265,7 +267,7 @@ class VGG_MODEL():
                                 steps_per_epoch=len(train),
                                 validation_data=valid,
                                 validation_steps=len(valid),
-                                callbacks = self.Set_Callbacks(),
+                                callbacks = self.Set_Callbacks(batch_size),
                                 verbose=0,
                                 shuffle=True)
             
@@ -292,5 +294,8 @@ class VGG_MODEL():
         plt.legend(['train_accuracy','val_accuracy'])
         if self.SAVE_GRAPH_DIRECTORY != None:
             plt.savefig(str(self.SAVE_GRAPH_DIRECTORY)+"acc.png")
+
+
+
         
 
