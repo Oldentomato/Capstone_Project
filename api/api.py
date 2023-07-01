@@ -1,16 +1,16 @@
 import sys
 sys.path.append(r"/app")
+# sys.path.append(r"D:\\yaming_dataset\\Yaming_AI\\api")
 from fastapi import FastAPI, UploadFile, status
-from database import send_query
+from api.database import send_query
 import os
 import uuid
 from pydantic import BaseModel
-from api.tensor_predict import Tensor_Detect
+from api.tensor_predict import Tensor_Predict
 from api.data_type import category
 
 
 app = FastAPI()
-
 
 class User(BaseModel):
     id: int
@@ -50,17 +50,26 @@ async def imagetest(file: UploadFile, userid: int):
 
         content = await file.read()
         filename = f"{str(uuid.uuid4())}.jpg" #uuid로 유니크한 파일명으로 변경
-        with open(os.path.join(UPLOAD_DIR,str(userid),filename),"wb") as fp:
+        file_fullname = os.path.join(UPLOAD_DIR,str(userid),filename)
+        with open(file_fullname,"wb") as fp:
             fp.write(content) #서버 로컬 스토리지에 이미지 저장
 
 
-        detect_module = Tensor_Detect(model_name = "best_2",
-                             img_path = os.path.join(UPLOAD_DIR,str(userid),filename),
-                             weight_path = "/data/best.h5")
+
+        # detect_module = Tensor_Detect(model_name = "best_2",
+        #                      img_path = os.path.join(UPLOAD_DIR,str(userid),filename),
+        #                      weight_path = "/data/best.h5")
 
 
-        model_result = detect_module.detect()
-        return {"filename": filename,"success": True, "category": category[model_result], "food_code":model_result}
+        model_result = Tensor_Predict(file_fullname)
+        if model_result == -1:
+            if os.path.isfile(file_fullname):
+                os.remove(file_fullname)                
+            return {"error": "predict_error", "success": False}
+        else:
+            if os.path.isfile(file_fullname):
+                os.remove(file_fullname)
+            return {"filename": filename,"success": True, "category": category[model_result], "food_code":model_result}
 
     else: #유저가 없을 경우
         return {"error": "not checked user","success": False}

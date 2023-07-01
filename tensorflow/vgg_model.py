@@ -64,6 +64,7 @@ class VGG_MODEL():
         )
 
         # 학습에 사용될 데이터 생성
+        #rgb 혹은 rgba 확인하기
         train_generator = train_datagen.flow_from_directory( #디렉토리에서 가져온 데이터를 flow시키는 것
             self.TRAIN_DIRECTORY+'train',
             target_size = (self.IMG_SIZE,self.IMG_SIZE), # (image_size, image_size)
@@ -100,7 +101,7 @@ class VGG_MODEL():
             '/data/api/tensorflow/tensor_ckpt/model-{epoch:04d}.h5', #모델 저장 경로
             monitor='val_accuracy', #모델을 저장할 때 기준이 되는 값
             verbose = 0, # 1이면 저장되었다고 화면에 뜨고 0이면 안뜸
-            save_best_only=False,
+            save_best_only=True,
             mode = 'max',
             #val_acc인 경우, 정확도이기 때문에 클수록 좋으므로 max를 쓰고, val_loss일 경우, loss값이기 떄문에 작을수록 좋으므로 min을써야한다
             #auto일 경우 모델이 알아서 min,max를 판단하여 모델을 저장한다
@@ -141,19 +142,21 @@ class VGG_MODEL():
 
     def Run_Training(self, **kargs):
         train,valid = self.__Set_Dataset_Generator(kargs['batch_size'])
+        
         vgg16 = VGG16(weights='imagenet', include_top=False, input_shape=(self.IMG_SIZE,self.IMG_SIZE,3)) #3채널만 됨
 
         vgg16.trainable = False 
 
         flat = GlobalAveragePooling2D()(vgg16.output)
 
-        Add_layer = Dense(units=hp_units_1, activation = kargs["activation"])(flat)
-        Add_layer = Dense(units=hp_units_2, activation = kargs["activation"])(Add_layer)
-        Add_layer = Dense(units=hp_units_3, activation = kargs["activation"])(Add_layer)
+        Add_layer = Dense(units=kargs["layer_1"], activation = kargs["activation"])(flat)
         Add_layer = Dense(53, activation = 'softmax')(Add_layer)
         model = Model(inputs=vgg16.input, outputs=Add_layer)
 
+        model.load_weights(kargs['model_path'])
+
         model.summary() #모델 구성을 보여줌
+
 
         model.compile(optimizer=tf.keras.optimizers.Adam(lr=kargs["learning_rate"]) ,loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
         with tf.device("/gpu:0"):
@@ -162,7 +165,7 @@ class VGG_MODEL():
                                 steps_per_epoch=len(train),
                                 validation_data=valid,
                                 validation_steps=len(valid),
-                                callbacks = self.Set_Callbacks(),
+                                callbacks = self.Set_Callbacks(kargs['batch_size']),
                                 verbose=0,
                                 shuffle=True)
             

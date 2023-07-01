@@ -4,17 +4,21 @@ import json
 import requests
 import cv2
 import numpy as np
-import sys
-sys.path.append(r"D:/yaming_dataset/Yaming_AI/api")
-from api.data_type import category
+from rembg import remove
 
 
-def Predict(img_path):
+#배경제거 작업이 필요함
+def Tensor_Predict(img_path):
     image = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+
     image = cv2.resize(image, dsize=(256,256),interpolation=cv2.INTER_LINEAR)
 
-    image = image / 255.0
-    image_arr = np.array(image)
+    image = remove(image)
+
+    non_bg_img = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
+
+    non_bg_img = non_bg_img / 255.0
+    image_arr = np.array(non_bg_img)
     image_arr = np.expand_dims(image_arr,axis=0)
 
     data = json.dumps({"signature_name":"serving_default","instances":image_arr.tolist()})
@@ -23,12 +27,13 @@ def Predict(img_path):
     json_response = requests.post('http://localhost:8501/v1/models/model:predict', data=data, headers=headers)
     prediction = json.loads(json_response.text)
 
-    predict_arr = np.array(prediction['predictions'])
-    result = np.argmax(predict_arr)
+    try:
+        predict_arr = np.array(prediction['predictions'])
+    except:
+        return -1
+    else:
+        return int(np.argmax(predict_arr))
 
-    print(category[result])
-
-    return category[result]
 
 #NOT USE
 # class Tensor_Detect():
@@ -51,7 +56,6 @@ def Predict(img_path):
     
 
 #debug 
-# if __name__ == "__main__":
-#     detect_model = Tensor_Detect("best.h5","../test_image/1000/test.jpg","../tensorflow/tensor_model")
-#     result = detect_model.Predict()
-#     print(result)
+if __name__ == "__main__":
+    detect_model = Tensor_Predict("D:\\yaming_dataset\\Yaming_AI\\api/test_image/1000/test.jpg")
+    print(detect_model)

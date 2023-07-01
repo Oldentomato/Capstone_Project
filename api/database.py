@@ -1,11 +1,13 @@
 # STEP 1
 import pymysql
-import os
 
 def send_query(query:str):
     # STEP 2: MySQL Connection 연결
-    con = pymysql.connect(host=os.environ['MYSQLHOST'], user=os.environ['MYSQLUSER'], password=os.environ['MYSQLPASS'], port=os.environ['MYSQLPORT'],
-                        db=os.environ['MYSQLDB'], charset='utf8') # 한글처리 (charset = 'utf8')
+    # con = pymysql.connect(host=os.environ['MYSQLHOST'], user=os.environ['MYSQLUSER'], password=os.environ['MYSQLPASS'], port=os.environ['MYSQLPORT'],
+    #                     db=os.environ['MYSQLDB'], charset='utf8') # 한글처리 (charset = 'utf8')
+    
+    con = pymysql.connect(host='35.197.32.189', user='root', password='qwer1234', port=5000,
+                        db='yaming', charset='utf8') # 한글처리 (charset = 'utf8')
 
 
 

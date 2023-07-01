@@ -6,7 +6,7 @@ import sys
 sys.path.append(r"D:/yaming_dataset/Yaming_AI/api")
 from api.data_type import category
 
-
+#검증할때 배경작업 해야함
 def TestModel():
     image = cv2.imread("test_image/1000/test4.jpg", cv2.IMREAD_UNCHANGED)
     image = cv2.resize(image, dsize=(256,256),interpolation=cv2.INTER_LINEAR)
