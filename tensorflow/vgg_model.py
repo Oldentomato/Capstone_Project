@@ -101,12 +101,17 @@ class VGG_MODEL():
             '/data/api/tensorflow/tensor_ckpt/model-{epoch:04d}.h5', #모델 저장 경로
             monitor='val_accuracy', #모델을 저장할 때 기준이 되는 값
             verbose = 0, # 1이면 저장되었다고 화면에 뜨고 0이면 안뜸
-            save_best_only=True,
+            save_best_only=False,
             mode = 'max',
             #val_acc인 경우, 정확도이기 때문에 클수록 좋으므로 max를 쓰고, val_loss일 경우, loss값이기 떄문에 작을수록 좋으므로 min을써야한다
             #auto일 경우 모델이 알아서 min,max를 판단하여 모델을 저장한다
             save_weights_only=False, #가중치만 저장할것인가 아닌가
             save_freq = 1*batch_size #3번째 에포크마다 가중치를 저장 period를 안쓰고 save_freq룰 씀
+        )
+
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_accuracy', factor=0.1, patience= 2*batch_size, verbose=0, mode='auto',
+            min_delta=0.0001, cooldown=0, min_lr=0
         )
 
         earlystop = EarlyStopping(
@@ -117,7 +122,7 @@ class VGG_MODEL():
             mode='auto'
         )
 
-        callbacks = [checkpoint,earlystop,TqdmCallback(verbose=1)]
+        callbacks = [checkpoint,earlystop,lr_scheduler,TqdmCallback(verbose=1)]
         return callbacks
     
     def Generate_feature(self):
@@ -228,12 +233,12 @@ class VGG_MODEL():
             Add_layer = Dense(units=hp_units_1, activation = hp_activate)(flat)
             # Add_layer = Dense(units=hp_units_2, activation = hp_activate)(Add_layer)
             # Add_layer = Dense(units=hp_units_3, activation = hp_activate)(Add_layer)
-            Add_layer = Dense(53, activation = 'softmax')(Add_layer)
+            Add_layer = Dense(25, activation = 'softmax')(Add_layer)
             model = Model(inputs=vgg16.input, outputs=Add_layer)
 
             model.summary() #모델 구성을 보여줌
 
-            model.compile(optimizer=tf.keras.optimizers.Adam(lr=hp_learning_rate) ,loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
+            model.compile(optimizer=tf.keras.optimizers.SGD(lr=hp_learning_rate) ,loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
 
             return model
         
