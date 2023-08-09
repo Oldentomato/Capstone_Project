@@ -10,7 +10,6 @@ import os
 import kerastuner as kt
 from tqdm.keras import TqdmCallback
 import numpy as np
-import sys
 
 
 
