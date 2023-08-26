@@ -8,12 +8,12 @@ def Training():
         img_size = 512,
         img_dir = '/dataset/nonbg_images/',
         train_dir = '/dataset/',
-        classes=25
+        classes=22
     )
 
     create_model.Use_GPU()
 
-    create_model.Generate_bottleneck(batch_size=8)#최초 한번만 실행할것
+    # create_model.Generate_bottleneck(batch_size=4,dir_name="vgg_size512_batch4")#최초 한번만 실행할것
 
 
     # history = create_model.Run_Training_Tuner(
@@ -32,10 +32,11 @@ def Training():
     #                                 "activates": ['relu'],
     #                                 "learning_rate":[0.01,0.001,0.0001]})
 
-    history = create_model.Run_Training(batch_size=16, 
+    history = create_model.Run_Training(batch_size=4, 
                                         layers=[(
-                                            512, 'relu'
+                                            256, 'relu'
                                         )], 
+                                        bottle_dir = "vgg_size256_batch8",
                                         learning_rate=0.001,
                                         train_epochs=100)
 

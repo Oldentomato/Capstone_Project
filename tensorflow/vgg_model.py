@@ -124,21 +124,21 @@ class VGG_MODEL():
         callbacks = [checkpoint,earlystop,lr_scheduler,TqdmCallback(verbose=1)]
         return callbacks
     
-    def Generate_feature(self):
+    def Generate_feature(self, batch_size):
         train_generator, valid_generator = self.__Set_Dataset()
         vgg16 = VGG16(weights='imagenet', include_top=False, input_shape=(self.IMG_SIZE,self.IMG_SIZE,3)) #3채널만 됨
             #imagenet에서 이미 학습된 가중치를 가져옴. 모델 커스터마이징 하려면 false로. 
 
         print("train_predict processed....")
         bottleneck_features_train = vgg16.predict_generator(
-            train_generator, 8
+            train_generator, batch_size
         )
         np.save(open('bottleneck_features/bottleneck_features_train.npy','wb'),
                 bottleneck_features_train)
         
         print("valid_predict processed....")
         bottleneck_features_valid = vgg16.predict_generator(
-            valid_generator, 8
+            valid_generator, batch_size
         )
         np.save(open('bottleneck_features/bottleneck_features_valid.npy','wb'),
                 bottleneck_features_valid)
