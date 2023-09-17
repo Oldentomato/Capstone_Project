@@ -1,10 +1,12 @@
 __pycache__
 test_image
 
-tensorflow/tensor_hyper
-tensorflow/tensor_model
-tensorflow/tensor_result_graph
-tensorflow/bottleneck_features
-tensorflow/triton/core/1
-tensorflow/saved_model
-tensorflow/tensor_ckpt
+*/tensor_hyper
+*/tensor_model
+*/tensor_result_graph
+*/bottleneck_features
+*/triton/core/1
+*/saved_model
+*/tensor_ckpt
+*/experiment
+*/logs

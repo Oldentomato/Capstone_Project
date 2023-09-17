@@ -1,7 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.layers import Dense, Input, Dropout, Flatten,GlobalAveragePooling2D
-from tensorflow.keras.applications.vgg16 import VGG16
+from tensorflow.keras.layers import Dense, Input, Dropout, GlobalAveragePooling2D, BatchNormalization, Activation
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 import matplotlib.pyplot as plt
@@ -9,8 +8,13 @@ import splitfolders
 import os
 from tqdm.keras import TqdmCallback
 import numpy as np
+import datetime
+from models.vgg import VGG
+from models.resnet import ResNet
+from models.densenet import DenseNet
 
-class VGG_MODEL():
+
+class Train():
     def __init__(self, img_size:int, img_dir:str, train_dir:str, classes:int):
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 경고 메시지를 숨기는 설정
         tf.get_logger().setLevel('ERROR')
@@ -19,6 +23,7 @@ class VGG_MODEL():
         self.TRAIN_DIRECTORY = train_dir
         self.CLASSES = classes
         self.SAVE_PARAM = None
+
 
         # check experiment
         try:
@@ -43,121 +48,46 @@ class VGG_MODEL():
                 # Memory growth must be set before GPUs have been initialized
                 print(e)
 
-    def __save_log(self):
-        pass
-
-    def __Set_Dataset_Generator(self,batch_size:int):
-        if 'train' not in os.listdir(self.TRAIN_DIRECTORY):
-            splitfolders.ratio(self.IMG_DIRECTORY, self.TRAIN_DIRECTORY,seed=1337, ratio=(0.8,0.2))
-
-        # 학습에 사용될 이미지 데이터 생성
-        train_datagen= ImageDataGenerator( #여기다가 여러 파라미터를 넣어서 새로운 이미지들을 만들어야한다
-            rescale = 1. /255, # 각픽셀을 최대값 255을 중심으로 0과 1사이의 값으로 재구성
-            rotation_range = 40,
-            width_shift_range= 0.2,
-            vertical_flip = True, 
-            height_shift_range = 0.2, 
-            shear_range = 0.2,
-            zoom_range = 0.2,
-            horizontal_flip = True,
-            fill_mode='nearest'
-        )
-
-        # 검증에 사용될 이미지 데이터 생성
-        valid_datagen = ImageDataGenerator(
-            rescale = 1. /255,
-        )
-
-        # 학습에 사용될 데이터 생성
-        #rgb 혹은 rgba 확인하기
-        train_generator = train_datagen.flow_from_directory( #디렉토리에서 가져온 데이터를 flow시키는 것
-            self.TRAIN_DIRECTORY+'train',
-            target_size = (self.IMG_SIZE,self.IMG_SIZE), # (image_size, image_size)
-            color_mode = 'rgb',
-            class_mode = 'sparse', #class를 어떻게 읽는지 설정
-            # binary: 이진 레이블의 1D numpy 배열
-            # categorical: one-hot 인코딩된 레이블의 2D numpy 배열입니다. 멀티 라벨 출력을 지원합니다.
-            # sparse: 정수 레이블의 1D numpy 배열,
-            # input: 입력 이미지와 동일한 이미지(주로 오토인코더 작업에 사용됨),
-            # other: y_col 데이터의 numpy 배열,
-            # None: 대상이 반환되지 않습니다(생성기는 에서 사용하는 데 유용한 이미지 데이터의 배치만 생성합니다 model.predict_generator()).
-            shuffle = False, # 섞는다는 뜻. 순서를 무작위로 적용한다.
-            batch_size = batch_size, # 배치 size는 한번에 gpu를 몇 개 보는가. 한번에 8장씩 학습시킨다
-        )
+        # config = tf.ConfigProto()
+        # config.gpu_options.allow_growth = True #탄력적 gpu memory 사용
+        # config.gpu_options.per_process_gpu_memory_fraction = 0.4
+        # session = tf.Session(config=config)
+        # tf.keras.backend.tensorflow_backend.set_session(session)
 
 
-        # 검증에 사용될 데이터 생성
-        valid_generator = valid_datagen.flow_from_directory(
-            self.TRAIN_DIRECTORY+'val',
-            target_size = (self.IMG_SIZE,self.IMG_SIZE),
-            color_mode = 'rgb',
-            class_mode = 'sparse',
-            shuffle = False,
-            batch_size = batch_size,
-        )
-
-        return train_generator, valid_generator
 
     def Set_Callbacks(self):
         checkpoint = ModelCheckpoint(
-            self.exp_path+"{epoch:03d}best.h5", #모델 저장 경로
+            self.exp_path+"/best.h5", #모델 저장 경로
             monitor='val_accuracy', #모델을 저장할 때 기준이 되는 값
             verbose = 0, # 1이면 저장되었다고 화면에 뜨고 0이면 안뜸
-            save_best_only=True,
-            mode = 'auto',
+            save_best_only=False,
+            mode = 'max',
             #val_acc인 경우, 정확도이기 때문에 클수록 좋으므로 max를 쓰고, val_loss일 경우, loss값이기 떄문에 작을수록 좋으므로 min을써야한다
             #auto일 경우 모델이 알아서 min,max를 판단하여 모델을 저장한다
             save_weights_only=False, #가중치만 저장할것인가 아닌가
-            save_freq = 3 #3번째 에포크마다 가중치를 저장 period를 안쓰고 save_freq룰 씀
+            save_freq = 'epoch' #3번째 에포크마다 가중치를 저장 period를 안쓰고 save_freq룰 씀
         )
 
         lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
-            monitor='val_accuracy', factor=0.1, patience= 5, verbose=0, mode='auto',
-            min_delta=0.0001, cooldown=0, min_lr=0
+            monitor='val_accuracy', factor=0.1, patience= 1, verbose=1, mode='max',
+            min_delta=0.1, cooldown=0, min_lr=0.00001
         )
+
+        tensorboard = tf.keras.callbacks.TensorBoard(log_dir="logs/fit/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
         earlystop = EarlyStopping(
-
             monitor='val_accuracy',
-            min_delta = 0.05,
-            patience = 3,
+            min_delta = 0.1,
+            patience = 1,
             verbose = 1,
-            mode='auto'
+            mode='max'
         )
 
-        callbacks = [checkpoint,earlystop,lr_scheduler,TqdmCallback(verbose=1)]
+        callbacks = [checkpoint,earlystop,lr_scheduler,tensorboard,TqdmCallback(verbose=1)]
         return callbacks
     
 
-    def Generate_bottleneck(self, batch_size, dir_name):
-
-        train,valid = self.__Set_Dataset_Generator(batch_size)
-
-        vgg16 = VGG16(weights='imagenet', include_top=False, input_shape=(self.IMG_SIZE,self.IMG_SIZE,3))
-
-
-        bottleneck_dir = os.listdir("./bottleneck_features/")
-
-        if dir_name not in bottleneck_dir:
-            os.mkdir(f"bottleneck_features/{dir_name}")
-
-        print("start extract train data\n")
-        bottleneck_features_train = vgg16.predict_generator(train)
-        print("start extract valid data\n")
-        bottleneck_features_valid = vgg16.predict_generator(valid)
-
-        # 매칭된 라벨 저장
-        train_labels = train.classes
-        valid_labels = valid.classes
-
-        # Bottleneck features와 라벨을 한 쌍으로 저장
-        print("saving\n")
-        np.save(open(f'bottleneck_features/{dir_name}/bottleneck_features_train.npy', 'wb'), bottleneck_features_train)
-        np.save(open(f'bottleneck_features/{dir_name}/bottleneck_features_valid.npy', 'wb'), bottleneck_features_valid)
-        np.save(open(f'bottleneck_features/{dir_name}/train_labels.npy', 'wb'), train_labels)
-        np.save(open(f'bottleneck_features/{dir_name}/valid_labels.npy', 'wb'), valid_labels)
-
-        print("feature extracted\n")
 
 
     
@@ -175,7 +105,18 @@ class VGG_MODEL():
         #혹시 이미 그려둔 그래프가 있다면 clear
         tf.keras.backend.clear_session()
 
+        if kargs["generate_feature"] == True:
+            if kargs["model_name"] == "vgg":
+                vgg_model = VGG(batch_size=8,bottle_dir="test",img_size=256,train_dir='/dataset/',img_dir='/dataset/nonbg_images/')
+                vgg_model()
+            elif kargs["model_name"] == "resnet":
+                resnet_model = ResNet(batch_size=kargs["batch_size"],bottle_dir=kargs["bottle_dir"],img_size=kargs["img_size"],train_dir=self.TRAIN_DIRECTORY,img_dir=self.IMG_DIRECTORY)
+                resnet_model()
+            elif kargs["model_name"] == "densenet":
+                densenet_model = DenseNet(batch_size=kargs["batch_size"],bottle_dir=kargs["bottle_dir"],img_size=kargs["img_size"],train_dir=self.TRAIN_DIRECTORY,img_dir=self.IMG_DIRECTORY)
+                densenet_model()
 
+            
 
         bottleneck_features_train = np.load(f'bottleneck_features/{kargs["bottle_dir"]}/bottleneck_features_train.npy')
         bottleneck_features_valid = np.load(f'bottleneck_features/{kargs["bottle_dir"]}/bottleneck_features_valid.npy')
@@ -189,12 +130,31 @@ class VGG_MODEL():
         inputs = Input(shape=input_shape)
         x = GlobalAveragePooling2D()(inputs)
 
-        for layer in kargs["layers"]:
-            Add_layer = Dense(units=layer[0], activation = layer[1])(x)
+        if len(kargs["layers"]) >= 1:
+            is_first_layer = True
+            for layer in kargs["layers"]:
+                if is_first_layer == True:
+                    Add_layer = Dense(units=layer[0])(x)
+                    if kargs["batch_normal"]:
+                        Add_layer = BatchNormalization()(Add_layer)
+                    Add_layer = Activation(layer[1])(Add_layer)
+                    is_first_layer = False
+                else:
+                    if layer[1] == "dropout":
+                        Add_layer = Dropout(layer[0])(Add_layer)
+                    else:
+                        Add_layer = Dense(units=layer[0])(Add_layer)
+                        if kargs["batch_normal"]:
+                            Add_layer = BatchNormalization()(Add_layer)
+                        Add_layer = Activation(layer[1])(Add_layer)
 
-        outputs = Dense(units=int(self.CLASSES), activation = 'softmax')(Add_layer)
+            outputs = Dense(units=int(self.CLASSES), activation = 'softmax')(Add_layer)
+        else:
+            outputs = Dense(units=int(self.CLASSES), activation = 'softmax')(x)
+
+
         
-
+        
         model = Model(inputs,outputs)
 
         # if kargs['model_path']:
@@ -217,6 +177,56 @@ class VGG_MODEL():
             
             
         return history
+    
+
+    def save_log(self, history):
+
+        acc = history.history["sparse_categorical_accuracy"]
+        val_acc = history.history["val_sparse_categorical_accuracy"]
+        loss = history.history["loss"]
+        val_loss = history.history["val_loss"]
+        
+        min_acc = min(acc)
+        max_acc = max(acc)
+
+
+        min_val_acc = min(val_acc)
+        max_val_acc = max(val_acc)
+
+        min_loss = min(loss)
+        max_loss = max(loss)
+
+        min_val_loss = min(val_loss)
+        max_val_loss = max(val_loss)
+
+        str_acc = list(map(str, acc))
+        str_val_acc = list(map(str, val_acc))
+        str_loss = list(map(str, loss))
+        str_val_loss = list(map(str, val_loss))
+
+
+        with open(f'{self.exp_path}/acctxt.txt','w') as acctxt:
+            acctxt.write("\n".join(str_acc))
+        with open(f'{self.exp_path}/val_acctxt.txt','w') as val_acctxt:
+            val_acctxt.write("\n".join(str_val_acc))
+        with open(f'{self.exp_path}/losstxt.txt','w') as losstxt:
+            losstxt.write("\n".join(str_loss))
+        with open(f'{self.exp_path}/val_losstxt.txt','w') as val_losstxt:
+            val_losstxt.write("\n".join(str_val_loss))
+
+        with open(f'{self.exp_path}/integrated analysis.txt','w') as int_ana:
+            int_ana.write(f"""
+                          
+                        min accuracy : {min_acc} in {acc.index(min_acc)} \n
+                        max accuracy : {max_acc} in {acc.index(max_acc)} \n
+                        min val_accuracy : {min_val_acc} in {val_acc.index(min_val_acc)} \n
+                        max val_accuracy : {max_val_acc} in {val_acc.index(max_val_acc)} \n
+
+                        min loss : {min_loss} in {loss.index(min_loss)} \n
+                        max loss : {max_loss} in {loss.index(max_loss)} \n
+                        min val_loss : {min_val_loss} in {val_loss.index(min_val_loss)} \n
+                        max val_loss : {max_val_loss} in {val_loss.index(max_val_loss)} \n
+                          """)
     
 
     def Draw_Graph(self, history):
