@@ -5,7 +5,7 @@ from train import Train
 def Training():
     img_size = 128
     batch_size = 4
-    generate_feature = True
+    generate_feature = False
     model_name = "densenet"
     bottle_dir = "dense_size256_batch2"
 
@@ -51,8 +51,9 @@ def Training():
         history = run_model.Run_Training(generate_feature = generate_feature,
                                         batch_normal = False,
                                         model_name = model_name,
+                                        img_size = img_size,
                                         layers=[(
-                                            512, "relu"
+                                            1024, "relu"
                                         )], 
                                         bottle_dir = bottle_dir,
                                         learning_rate=0.001,
