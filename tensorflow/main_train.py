@@ -6,6 +6,11 @@ def Training():
     img_size = 128
     batch_size = 4
     generate_feature = False
+    lr = 0.001
+    epoch = 100
+    layers = [(
+        1024, "relu"
+    )]
     model_name = "densenet"
     bottle_dir = "dense_size256_batch2"
 
@@ -41,26 +46,28 @@ def Training():
                                         img_size = img_size,
                                         model_name = model_name,
                                             batch_normal = True,
-                                            layers=[(
-                                                512, "relu"
-                                            )], 
+                                            layers=layers,
                                             bottle_dir = bottle_dir,
-                                            learning_rate=0.001,
-                                            train_epochs=100)
+                                            learning_rate=lr,
+                                            train_epochs=epoch)
     else:
         history = run_model.Run_Training(generate_feature = generate_feature,
                                         batch_normal = False,
                                         model_name = model_name,
                                         img_size = img_size,
-                                        layers=[(
-                                            1024, "relu"
-                                        )], 
+                                        layers=layers,
                                         bottle_dir = bottle_dir,
-                                        learning_rate=0.001,
-                                        train_epochs=100)
+                                        learning_rate=lr,
+                                        train_epochs=epoch)
     
 
-    run_model.save_log(history)
+    run_model.save_log(history=history,
+                        model_name=model_name,
+                        img_size=img_size,
+                        batch_size=batch_size,
+                        lr=0.001,
+                        epochs=100,
+                        layers=layers)
 
     run_model.Draw_Graph(history)
 

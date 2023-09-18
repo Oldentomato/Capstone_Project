@@ -179,7 +179,7 @@ class Train():
         return history
     
 
-    def save_log(self, history):
+    def save_log(self, history,model_name,img_size,batch_size,lr,epochs,layers):
 
         acc = history.history["sparse_categorical_accuracy"]
         val_acc = history.history["val_sparse_categorical_accuracy"]
@@ -216,6 +216,14 @@ class Train():
 
         with open(f'{self.exp_path}/integrated analysis.txt','w') as int_ana:
             int_ana.write(f"""
+
+                        <Parameters>
+                        model_name : {model_name}
+                        img_size : {img_size}
+                        batch_size : {batch_size}
+                        lr : {lr}
+                        epochs : {epochs}
+                        layers : {layers}
                           
                         min accuracy : {min_acc} in {acc.index(min_acc)} \n
                         max accuracy : {max_acc} in {acc.index(max_acc)} \n
